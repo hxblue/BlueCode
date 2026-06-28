@@ -1,0 +1,32 @@
+# BlueCode 配置示例。复制为 .bluecode/config.yaml 后填入真实密钥。
+#
+# 记忆与会话持久化：
+# - 项目指令按优先级加载：./MEWCODE.md > ./.bluecode/MEWCODE.md > ~/.bluecode/MEWCODE.md
+# - 会话归档写入 ./.bluecode/sessions/<session_id>/conversation.jsonl
+# - 项目级长期记忆写入 ./.bluecode/memory/，用户级长期记忆写入 ~/.bluecode/memory/
+providers:
+  - name: "Claude"
+    protocol: "anthropic"
+    base_url: ""
+    api_key: "sk-ant-..."
+    model: "claude-sonnet-4-5"
+    thinking: true
+    # context_window 单位 token,可选;未配置时按 protocol 默认(anthropic 200000、openai 128000)。
+    context_window: 200000
+
+  # OpenAI 或 OpenAI 兼容端点示例：
+  # - name: "OpenAI"
+  #   protocol: "openai"
+  #   base_url: ""
+  #   api_key: "sk-..."
+  #   model: "gpt-4.1-mini"
+  #   thinking: false
+  #   context_window: 128000
+  #
+  # - name: "Compat"
+  #   protocol: "openai-compat"
+  #   base_url: "https://api.example.com/v1"
+  #   api_key: "your-key"
+  #   model: "compatible-model"
+  #   thinking: false
+  #   context_window: 200000

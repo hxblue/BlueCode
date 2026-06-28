@@ -1,0 +1,13 @@
+package com.bluecode.session;
+
+import java.nio.file.Path;
+import java.time.Instant;
+
+public record SessionInfo(
+        String id,
+        String title,
+        Instant modifiedAt,
+        String model,
+        long size,
+        Path dir) {
+}

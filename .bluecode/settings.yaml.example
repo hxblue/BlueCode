@@ -1,0 +1,12 @@
+# BlueCode 权限配置示例。项目级配置可复制为 .bluecode/settings.yaml。
+# 本地永久允许会写入 .bluecode/settings.local.yaml，该文件已被 gitignore。
+defaultMode: default
+permissions:
+  allow:
+    - Bash(git status)
+    - Bash(./gradlew test)
+    - Write(src/**)
+  deny:
+    - Bash(git push)
+    - Read(.env)
+    - Write(.env)
