@@ -21,6 +21,7 @@ import com.bluecode.compact.state.SessionContext;
 import com.bluecode.config.ProviderConfig;
 import com.bluecode.conversation.ConversationManager;
 import com.bluecode.conversation.Message;
+import com.bluecode.coordinator.Coordinator;
 import com.bluecode.hook.DispatchResult;
 import com.bluecode.hook.HookEngine;
 import com.bluecode.hook.HookRule;
@@ -40,6 +41,7 @@ import com.bluecode.skill.LoadSkillTool;
 import com.bluecode.skill.SkillCatalog;
 import com.bluecode.skill.SkillExecutor;
 import com.bluecode.subagent.Catalog;
+import com.bluecode.team.TeamManager;
 import com.bluecode.tool.Registry;
 import com.bluecode.tool.ToolContext;
 import com.bluecode.tui.tea.Command;
@@ -88,6 +90,8 @@ public class bluecodeModel implements Model, Ui {
     private final Catalog subAgentCatalog;
     private final HookEngine hookEngine;
     private final WorktreeManager worktreeMgr;
+    private final TeamManager teamManager;
+    private final boolean coordinatorMode;
     private final List<ChatMessage> chatMessages = new ArrayList<>();
     private final MarkdownRenderer markdownRenderer = new MarkdownRenderer();
     private final StringBuilder input = new StringBuilder();
@@ -206,6 +210,26 @@ public class bluecodeModel implements Model, Ui {
             Catalog subAgentCatalog,
             HookEngine hookEngine,
             WorktreeManager worktreeMgr) {
+        this(providers, registry, engine, runtime, sessionWriter, memoryManager, instructionText, memoryText, cwd,
+                taskManager, subAgentCatalog, hookEngine, worktreeMgr, null, false);
+    }
+
+    public bluecodeModel(
+            List<ProviderConfig> providers,
+            Registry registry,
+            PermissionEngine engine,
+            SessionRuntime runtime,
+            Writer sessionWriter,
+            Manager memoryManager,
+            String instructionText,
+            String memoryText,
+            Path cwd,
+            com.bluecode.task.Manager taskManager,
+            Catalog subAgentCatalog,
+            HookEngine hookEngine,
+            WorktreeManager worktreeMgr,
+            TeamManager teamManager,
+            boolean coordinatorMode) {
         if (providers == null || providers.isEmpty()) {
             throw new IllegalArgumentException("providers 不能为空");
         }
@@ -218,6 +242,8 @@ public class bluecodeModel implements Model, Ui {
         this.subAgentCatalog = subAgentCatalog;
         this.hookEngine = hookEngine;
         this.worktreeMgr = worktreeMgr;
+        this.teamManager = teamManager;
+        this.coordinatorMode = coordinatorMode;
         this.memoryText = memoryText == null ? "" : memoryText;
         this.conversation = sessionWriter == null
                 ? new ConversationManager()
@@ -225,7 +251,7 @@ public class bluecodeModel implements Model, Ui {
         this.providers = List.copyOf(providers);
         this.registry = registry == null ? Registry.createDefault() : registry;
         CommandRegistry commands = new CommandRegistry();
-        Builtins.registerAll(commands);
+        Builtins.registerAll(commands, teamManager);
         this.cmdRegistry = commands;
         this.engine = engine == null ? PermissionEngine.create(Path.of("").toAbsolutePath()) : engine;
         this.runtime = runtime == null ? SessionRuntime.empty(providers.getFirst().effectiveContextWindow()) : runtime;
@@ -243,6 +269,7 @@ public class bluecodeModel implements Model, Ui {
             this.state = AppState.PROVIDER_SELECT;
         }
         startTaskDoneConsumer();
+        startLeadMailWatcher();
     }
 
     public void setProgram(Program program) {
@@ -265,6 +292,7 @@ public class bluecodeModel implements Model, Ui {
             }
             case KeyPressMessage key -> command = handleKey(key);
             case AgentEventMessage agentEvent -> command = handleAgentEvent(agentEvent.event());
+            case LeadMailEvent leadMail -> command = handleLeadMailEvent(leadMail);
             case TickMessage ignored -> {
                 if (streaming) {
                     spinnerFrame++;
@@ -537,6 +565,21 @@ public class bluecodeModel implements Model, Ui {
         return Command.none();
     }
 
+    private Command handleLeadMailEvent(LeadMailEvent event) {
+        if (event == null) {
+            return Command.none();
+        }
+        String text = event.displayText();
+        if (idle()) {
+            chatMessages.add(ChatMessage.user(text));
+            conversation.addUserMessage(text);
+            startTurn();
+            return tick();
+        }
+        pushSystemMessage(text);
+        return Command.none();
+    }
+
     private Command handleApprovalKey(KeyPressMessage key) {
         if ("up".equals(key.key())) {
             approveCursor = Math.floorMod(approveCursor - 1, 3);
@@ -687,12 +730,12 @@ public class bluecodeModel implements Model, Ui {
         }
         agent = Agent.builder()
                 .client(client)
-                .registry(registry)
+                .registry(coordinatorMode ? registry.filtered(Coordinator.allowedTools()) : registry)
                 .version(VERSION)
                 .engine(engine)
                 .runtime(runtime)
                 .memoryManager(memoryManager)
-                .instructionText(instructionText)
+                .instructionText(coordinatorMode ? instructionText + Coordinator.systemPromptSuffix() : instructionText)
                 .memoryText(memoryText)
                 .skillCatalog(skillCatalog)
                 .hookEngine(hookEngine)
@@ -784,6 +827,14 @@ public class bluecodeModel implements Model, Ui {
         });
     }
 
+    private void startLeadMailWatcher() {
+        LeadMailWatcher.start(teamManager, runtime, event -> {
+            if (program != null) {
+                program.send(event);
+            }
+        });
+    }
+
     void pushSystemMessage(String message) {
         chatMessages.add(ChatMessage.system(message));
     }
@@ -820,7 +871,8 @@ public class bluecodeModel implements Model, Ui {
     }
 
     private List<Map<String, Object>> currentToolDefinitions() {
-        return mode == Mode.PLAN ? registry.readOnlyDefinitions() : registry.definitions();
+        ensureAgent();
+        return mode == Mode.PLAN ? agent.registry().readOnlyDefinitions() : agent.registry().definitions();
     }
 
     public Command dispatchSlash(String text) {
@@ -1508,12 +1560,13 @@ public class bluecodeModel implements Model, Ui {
     }
 
     private String modeLabel() {
-        return switch (mode) {
+        String label = switch (mode) {
             case DEFAULT -> "DEFAULT";
             case ACCEPT_EDITS -> "ACCEPT EDITS";
             case PLAN -> "PLAN";
             case BYPASS -> "BYPASS";
         };
+        return coordinatorMode ? label + " [COORDINATOR]" : label;
     }
 
     private String renderToolMessage(ChatMessage message) {

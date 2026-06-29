@@ -60,7 +60,17 @@ public final class ConfigLoader {
                 rootMap,
                 "enable_subagent_background",
                 "enableSubAgentBackground"));
+        config.setFeatures(bindFeatures(rootMap.get("features")));
         return config;
+    }
+
+    private static AppConfig.FeaturesConfig bindFeatures(Object raw) {
+        if (!(raw instanceof Map<?, ?> map)) {
+            return new AppConfig.FeaturesConfig(false, false);
+        }
+        return new AppConfig.FeaturesConfig(
+                firstBooleanValue(map, "coordinator_mode", "coordinatorMode") == Boolean.TRUE,
+                firstBooleanValue(map, "fork_teammate", "forkTeammate") == Boolean.TRUE);
     }
 
     private static ProviderConfig bindProvider(Map<?, ?> item, int index) {

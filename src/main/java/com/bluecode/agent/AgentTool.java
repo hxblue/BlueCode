@@ -5,6 +5,8 @@ import com.bluecode.permission.Mode;
 import com.bluecode.permission.Outcome;
 import com.bluecode.subagent.Catalog;
 import com.bluecode.subagent.Definition;
+import com.bluecode.team.BackendType;
+import com.bluecode.team.exceptions.InProcessTeammateNoSpawnException;
 import com.bluecode.tool.Filter;
 import com.bluecode.tool.Registry;
 import com.bluecode.tool.Result;
@@ -28,6 +30,7 @@ public final class AgentTool implements Tool {
     private final com.bluecode.task.Manager taskManager;
     private final boolean backgroundEnabled;
     private final WorktreeManager worktreeManager;
+    private final TeamHook teamHook;
     private volatile Agent parentAgent;
 
     public AgentTool(Catalog catalog, com.bluecode.task.Manager taskManager, Agent parentAgent,
@@ -37,11 +40,17 @@ public final class AgentTool implements Tool {
 
     public AgentTool(Catalog catalog, com.bluecode.task.Manager taskManager, Agent parentAgent,
                      boolean backgroundEnabled, WorktreeManager worktreeManager) {
+        this(catalog, taskManager, parentAgent, backgroundEnabled, worktreeManager, null);
+    }
+
+    public AgentTool(Catalog catalog, com.bluecode.task.Manager taskManager, Agent parentAgent,
+                     boolean backgroundEnabled, WorktreeManager worktreeManager, TeamHook teamHook) {
         this.catalog = catalog;
         this.taskManager = taskManager;
         this.parentAgent = parentAgent;
         this.backgroundEnabled = backgroundEnabled;
         this.worktreeManager = worktreeManager;
+        this.teamHook = teamHook;
     }
 
     public void setParent(Agent parentAgent) {
@@ -73,6 +82,7 @@ public final class AgentTool implements Tool {
         properties.put("model", Map.of("type", "string", "description", "模型覆盖: haiku/sonnet/opus/inherit"));
         properties.put("run_in_background", Map.of("type", "boolean", "description", "是否后台运行"));
         properties.put("name", Map.of("type", "string", "description", "本次后台 Agent 名称"));
+        properties.put("teamName", Map.of("type", "string", "description", "可选;非空时把该 Agent 派入指定 Team"));
         return Map.of("type", "object", "properties", properties, "required", List.of("prompt", "description"));
     }
 
@@ -90,6 +100,10 @@ public final class AgentTool implements Tool {
         }
 
         Optional<Agent.RunContext> current = Agent.currentRunContext();
+        String teamName = string(args, "teamName");
+        if (!teamName.isBlank()) {
+            return executeTeamSpawn(ctx, args, prompt, description, current);
+        }
         if (current.map(Agent.RunContext::subAgent).orElse(false)) {
             return Result.error("子 Agent 不能再次启动 Agent");
         }
@@ -183,6 +197,41 @@ public final class AgentTool implements Tool {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Result.error("子 Agent 被中断");
+        }
+    }
+
+    private Result executeTeamSpawn(
+            ToolContext ctx,
+            Map<String, Object> args,
+            String prompt,
+            String description,
+            Optional<Agent.RunContext> current) {
+        if (teamHook == null) {
+            return Result.error("Team spawn 尚未配置");
+        }
+        Optional<TeammateContext> teammate = teamHook.teammateContextOf(current.orElse(null));
+        if (teammate.map(value -> value.backendType() == BackendType.IN_PROCESS).orElse(false)) {
+            return Result.error(new InProcessTeammateNoSpawnException().getMessage());
+        }
+        Agent parent = parentAgent != null ? parentAgent : current.map(Agent.RunContext::agent).orElse(null);
+        if (parent == null) {
+            return Result.error("Agent 工具尚未绑定主 Agent");
+        }
+        try {
+            String result = teamHook.spawnTeammate(new TeamSpawnRequest(
+                    string(args, "teamName"),
+                    string(args, "name"),
+                    description,
+                    prompt,
+                    string(args, "subagent_type"),
+                    string(args, "model"),
+                    bool(args, "run_in_background"),
+                    parent,
+                    current.map(Agent.RunContext::conversation).orElse(null),
+                    ctx == null ? ToolContext.root() : ctx));
+            return Result.ok(result);
+        } catch (Exception e) {
+            return Result.error("Team spawn 失败: " + e.getMessage());
         }
     }
 

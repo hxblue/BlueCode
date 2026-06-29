@@ -15,16 +15,26 @@ import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 public final class Manager {
     private final Object mu = new Object();
     private final Map<String, BackgroundTask> tasks = new HashMap<>();
     private final Map<String, String> byName = new HashMap<>();
+    private final List<Consumer<String>> taskDoneCallbacks = new ArrayList<>();
     private final BlockingQueue<String> donePub = new LinkedBlockingQueue<>(32);
     private final AtomicLong counter = new AtomicLong();
+    private com.bluecode.teams.AgentNameRegistry nameRegistry;
 
     public String launch(Agent agent, ConversationManager conversation, String name, String taskText) {
         BackgroundTask task = createTask(nextId(), agent, conversation, name, taskText, new CancelToken());
+        runTask(task, taskText);
+        return task.id();
+    }
+
+    public String launchWithId(String id, Agent agent, ConversationManager conversation, String name, String taskText) {
+        String effectiveId = id == null || id.isBlank() ? nextId() : id;
+        BackgroundTask task = createTask(effectiveId, agent, conversation, name, taskText, new CancelToken());
         runTask(task, taskText);
         return task.id();
     }
@@ -58,7 +68,7 @@ public final class Manager {
     public String sendMessage(String name, String message) {
         BackgroundTask task;
         synchronized (mu) {
-            String id = byName.get(name);
+            String id = nameRegistry == null ? byName.get(name) : nameRegistry.resolve(name).orElse(byName.get(name));
             task = id == null ? null : tasks.get(id);
         }
         if (task == null) {
@@ -79,6 +89,28 @@ public final class Manager {
         return donePub;
     }
 
+    public void setNameRegistry(com.bluecode.teams.AgentNameRegistry registry) {
+        synchronized (mu) {
+            this.nameRegistry = registry;
+        }
+    }
+
+    public Optional<BackgroundTask> getByName(String name) {
+        synchronized (mu) {
+            String id = nameRegistry == null ? byName.get(name) : nameRegistry.resolve(name).orElse(byName.get(name));
+            return Optional.ofNullable(id == null ? null : tasks.get(id));
+        }
+    }
+
+    public void onTaskDone(Consumer<String> callback) {
+        if (callback == null) {
+            return;
+        }
+        synchronized (mu) {
+            taskDoneCallbacks.add(callback);
+        }
+    }
+
     private BackgroundTask createTask(String id, Agent agent, ConversationManager conversation, String name,
                                       String taskText, CancelToken cancelToken) {
         BackgroundTask task = new BackgroundTask(id, name, agent, conversation, taskText, cancelToken);
@@ -86,6 +118,9 @@ public final class Manager {
             tasks.put(id, task);
             if (name != null && !name.isBlank()) {
                 byName.put(name, id);
+                if (nameRegistry != null) {
+                    nameRegistry.register(name, id);
+                }
             }
         }
         return task;
@@ -117,8 +152,23 @@ public final class Manager {
                 if (!donePub.offer(task.id())) {
                     System.err.printf("[task] warn: done queue full, dropping notification for %s%n", task.id());
                 }
+                notifyTaskDone(task.id());
             }
         });
+    }
+
+    private void notifyTaskDone(String id) {
+        List<Consumer<String>> callbacks;
+        synchronized (mu) {
+            callbacks = List.copyOf(taskDoneCallbacks);
+        }
+        for (Consumer<String> callback : callbacks) {
+            try {
+                callback.accept(id);
+            } catch (Exception e) {
+                System.err.printf("[task] warn: done callback failed for %s: %s%n", id, e.getMessage());
+            }
+        }
     }
 
     private void aggregate(BlockingQueue<Event> events, BackgroundTask task) {

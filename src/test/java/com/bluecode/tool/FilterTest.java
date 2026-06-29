@@ -46,4 +46,17 @@ class FilterTest {
         assertTrue(Filter.isMcpOrSkill("mcp__x__y"));
         assertFalse(Filter.isMcpOrSkill("TaskGet"));
     }
+
+    @Test
+    void teammateFlagAllowsCollaborationTools() {
+        List<String> result = Filter.applyAgentToolFilter(new Filter.FilterParams(
+                List.of("ReadFile", "TaskCreate", "SendMessage", "Agent"),
+                1,
+                true,
+                List.of(),
+                List.of(),
+                true));
+
+        assertEquals(List.of("ReadFile", "TaskCreate", "SendMessage"), result);
+    }
 }

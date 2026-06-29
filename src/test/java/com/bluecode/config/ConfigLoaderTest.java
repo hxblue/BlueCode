@@ -71,6 +71,25 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void loadsFeatureFlags() throws IOException {
+        Path config = write("""
+            providers:
+              - name: Test
+                protocol: openai
+                api_key: test-key
+                model: test-model
+            features:
+              coordinator_mode: true
+              fork_teammate: true
+            """);
+
+        AppConfig appConfig = ConfigLoader.load(config.toString());
+
+        assertTrue(appConfig.getFeatures().coordinatorMode());
+        assertTrue(appConfig.getFeatures().forkTeammate());
+    }
+
+    @Test
     void rejectsMissingApiKey() throws IOException {
         Path config = write("""
             providers:

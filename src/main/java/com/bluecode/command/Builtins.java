@@ -7,6 +7,10 @@ public final class Builtins {
     }
 
     public static void registerAll(CommandRegistry registry) {
+        registerAll(registry, null);
+    }
+
+    public static void registerAll(CommandRegistry registry, com.bluecode.team.TeamManager teamManager) {
         registry.register(command("clear", "清空当前会话并开启新会话", Kind.UI, BuiltinUi.clear()));
         registry.register(command("compact", "手动压缩当前上下文", Kind.UI, BuiltinUi.compact()));
         registry.register(command("do", "切回执行模式并按计划开始执行", Kind.PROMPT, BuiltinPrompt.doRun()));
@@ -20,6 +24,9 @@ public final class Builtins {
         registry.register(command("review", "注入代码审查请求并开始回复", Kind.PROMPT, BuiltinPrompt.review()));
         registry.register(command("session", "显示当前会话标识和路径", Kind.LOCAL, BuiltinLocal.session()));
         registry.register(command("status", "显示当前运行状态", Kind.LOCAL, BuiltinLocal.status()));
+        if (teamManager != null) {
+            registry.register(BuiltinTeam.command(teamManager));
+        }
         registry.register(command("worktree", "管理 Git Worktree 隔离副本", Kind.UI, WorktreeCommand.handler()));
     }
 

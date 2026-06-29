@@ -6,6 +6,13 @@ import com.bluecode.llm.LlmClient;
 import com.bluecode.llm.Request;
 import com.bluecode.llm.StreamEvent;
 import com.bluecode.permission.PermissionEngine;
+import com.bluecode.team.Team;
+import com.bluecode.team.TeamManager;
+import com.bluecode.teams.AgentNameRegistry;
+import com.bluecode.teams.TaskCreateTool;
+import com.bluecode.teams.TaskUpdateTool;
+import com.bluecode.teams.TeamCreateTool;
+import com.bluecode.teams.TeamDeleteTool;
 import com.bluecode.tool.Registry;
 import com.bluecode.tool.Result;
 import org.junit.jupiter.api.Test;
@@ -50,6 +57,53 @@ class ToolsTest {
 
         Result stop = new TaskStopTool(manager).execute(Map.of("task_id", id));
         assertFalse(stop.isError());
+    }
+
+    @Test
+    void combinedTaskToolsRegisterOnceAndRouteTeamRequests() throws Exception {
+        Manager manager = new Manager();
+        TeamManager teamManager = new TeamManager(
+                tempDir.resolve("home"),
+                tempDir.resolve("project"),
+                null,
+                manager,
+                new AgentNameRegistry());
+        Team team = teamManager.create("demo", "demo team");
+        String teamTaskId = new com.bluecode.teams.Store(team.tasksPath()).create(new com.bluecode.teams.Task(
+                "",
+                "write report",
+                "draft summary",
+                com.bluecode.teams.Status.PENDING,
+                "lead",
+                java.util.List.of(),
+                java.util.List.of(),
+                0,
+                0));
+
+        Registry registry = Registry.createDefault();
+        registry.register(new TaskListTool(manager, teamManager));
+        registry.register(new TaskGetTool(manager, teamManager));
+        registry.register(new TaskStopTool(manager));
+        registry.register(new SendMessageTool(manager, teamManager));
+        registry.register(new TeamCreateTool(teamManager));
+        registry.register(new TeamDeleteTool(teamManager));
+        registry.register(new TaskCreateTool(teamManager));
+        registry.register(new TaskUpdateTool(teamManager));
+
+        Result list = new TaskListTool(manager, teamManager).execute(Map.of("teamName", "demo"));
+        assertFalse(list.isError());
+        assertTrue(list.content().contains(teamTaskId));
+
+        Result get = new TaskGetTool(manager, teamManager).execute(Map.of("teamName", "demo", "taskId", teamTaskId));
+        assertFalse(get.isError());
+        assertTrue(get.content().contains("write report"));
+
+        Result send = new SendMessageTool(manager, teamManager).execute(Map.of(
+                "teamName", "demo",
+                "to", "lead",
+                "message", "ping"));
+        assertFalse(send.isError());
+        assertTrue(send.content().contains("\"teamName\":\"demo\""));
     }
 
     private static final class FakeClient implements LlmClient {

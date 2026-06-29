@@ -17,6 +17,12 @@ public final class Filter {
             "Bash",
             "LoadSkill",
             "InstallSkill");
+    public static final List<String> TEAMMATE_ALLOWED_TOOLS = List.of(
+            "TaskCreate",
+            "TaskGet",
+            "TaskList",
+            "TaskUpdate",
+            "SendMessage");
 
     private Filter() {
     }
@@ -26,7 +32,12 @@ public final class Filter {
             int source,
             boolean background,
             List<String> allowed,
-            List<String> disallowed) {
+            List<String> disallowed,
+            boolean teammate) {
+        public FilterParams(List<String> all, int source, boolean background, List<String> allowed, List<String> disallowed) {
+            this(all, source, background, allowed, disallowed, false);
+        }
+
         public FilterParams {
             all = all == null ? List.of() : List.copyOf(all);
             allowed = allowed == null ? List.of() : List.copyOf(allowed);
@@ -44,7 +55,14 @@ public final class Filter {
 
         if (params.background()) {
             Set<String> asyncAllowed = new LinkedHashSet<>(ASYNC_AGENT_ALLOWED_TOOLS);
+            if (params.teammate()) {
+                asyncAllowed.addAll(TEAMMATE_ALLOWED_TOOLS);
+            }
             current.removeIf(name -> !asyncAllowed.contains(name) && !isMcpOrSkill(name));
+        }
+
+        if (!params.teammate()) {
+            current.removeAll(TEAMMATE_ALLOWED_TOOLS);
         }
 
         current.removeAll(params.disallowed());

@@ -80,7 +80,9 @@ public final class Agent {
     private final boolean subAgent;
     private final HookEngine hookEngine;
     private final ReentrantLock runLock = new ReentrantLock();
+    private final TeammateContext teammateContext;
     private volatile ToolContext toolContext;
+    private volatile Mode runtimePermissionMode;
 
     public Agent(LlmClient client, Registry registry) {
         this(client, registry, "dev");
@@ -153,7 +155,7 @@ public final class Agent {
             HookEngine hookEngine) {
         this(client, registry, version, engine, runtime, memoryManager, instructionText, memoryText,
                 skillCatalog, systemPrompt, maxTurns, permissionMode, permissionModeSet, dontAsk,
-                approvalUpgrader, subAgent, hookEngine, ToolContext.root());
+                approvalUpgrader, subAgent, hookEngine, ToolContext.root(), null);
     }
 
     public Agent(
@@ -175,6 +177,31 @@ public final class Agent {
             boolean subAgent,
             HookEngine hookEngine,
             ToolContext toolContext) {
+        this(client, registry, version, engine, runtime, memoryManager, instructionText, memoryText,
+                skillCatalog, systemPrompt, maxTurns, permissionMode, permissionModeSet, dontAsk,
+                approvalUpgrader, subAgent, hookEngine, toolContext, null);
+    }
+
+    public Agent(
+            LlmClient client,
+            Registry registry,
+            String version,
+            PermissionEngine engine,
+            SessionRuntime runtime,
+            Manager memoryManager,
+            String instructionText,
+            String memoryText,
+            SkillCatalog skillCatalog,
+            String systemPrompt,
+            int maxTurns,
+            Mode permissionMode,
+            boolean permissionModeSet,
+            boolean dontAsk,
+            ApprovalUpgrader approvalUpgrader,
+            boolean subAgent,
+            HookEngine hookEngine,
+            ToolContext toolContext,
+            TeammateContext teammateContext) {
         this.client = client;
         this.registry = registry;
         this.version = version == null || version.isBlank() ? "dev" : version;
@@ -193,6 +220,7 @@ public final class Agent {
         this.subAgent = subAgent;
         this.hookEngine = hookEngine;
         this.toolContext = toolContext == null ? ToolContext.root() : toolContext;
+        this.teammateContext = teammateContext;
         this.runtime.hookEngine = hookEngine;
     }
 
@@ -266,6 +294,14 @@ public final class Agent {
         return toolContext == null ? ToolContext.root() : toolContext;
     }
 
+    public TeammateContext teammateContext() {
+        return teammateContext;
+    }
+
+    public void setPermissionMode(Mode mode) {
+        this.runtimePermissionMode = mode == null ? Mode.DEFAULT : mode;
+    }
+
     public void setToolContext(ToolContext toolContext) {
         this.toolContext = toolContext == null ? ToolContext.root() : toolContext;
     }
@@ -311,7 +347,7 @@ public final class Agent {
     private void runLoop(ConversationManager conversation, Mode mode, CancelToken cancel, BlockingQueue<Event> out,
                          boolean updateMemory, int maxIterations) {
         RunContext previous = CURRENT_CONTEXT.get();
-        CURRENT_CONTEXT.set(new RunContext(this, conversation, subAgent));
+        CURRENT_CONTEXT.set(new RunContext(this, conversation, subAgent, teammateContext));
         try {
             String stableSystem = systemPrompt.isBlank()
                     ? PromptBuilder.buildSystemPrompt(instructionText, currentMemoryText(), skillsCatalogText())
@@ -324,6 +360,7 @@ public final class Agent {
                     return;
                 }
                 out.offer(new Event.Iter(iter));
+                TeamMailboxIngestor.ingest(this, runtime);
 
                 List<Map<String, Object>> tools = mode == Mode.PLAN ? registry.readOnlyDefinitions() : registry.definitions();
                 String environment = environmentText();
@@ -783,6 +820,9 @@ public final class Agent {
     }
 
     private Mode effectiveModeFor(Mode requested) {
+        if (runtimePermissionMode != null) {
+            return runtimePermissionMode;
+        }
         return permissionModeSet ? permissionMode : (requested == null ? Mode.DEFAULT : requested);
     }
 
@@ -1003,7 +1043,7 @@ public final class Agent {
     public record ForceCompactResult(long before, long after, Throwable error) {
     }
 
-    public record RunContext(Agent agent, ConversationManager conversation, boolean subAgent) {
+    public record RunContext(Agent agent, ConversationManager conversation, boolean subAgent, TeammateContext teammateContext) {
     }
 
     private record StreamPass(String text, List<ToolCall> calls, com.bluecode.llm.Usage usage, boolean cancelled) {
@@ -1040,6 +1080,7 @@ public final class Agent {
         private boolean subAgent;
         private HookEngine hookEngine;
         private ToolContext toolContext = ToolContext.root();
+        private TeammateContext teammateContext;
 
         public Builder client(LlmClient client) {
             this.client = client;
@@ -1131,6 +1172,11 @@ public final class Agent {
             return this;
         }
 
+        public Builder teammateContext(TeammateContext teammateContext) {
+            this.teammateContext = teammateContext;
+            return this;
+        }
+
         public Agent build() {
             if (client == null) {
                 throw new IllegalArgumentException("client 不能为空");
@@ -1155,7 +1201,8 @@ public final class Agent {
                     approvalUpgrader,
                     subAgent,
                     hookEngine,
-                    toolContext);
+                    toolContext,
+                    teammateContext);
         }
     }
 }

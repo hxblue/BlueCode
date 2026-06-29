@@ -7,11 +7,14 @@ import com.bluecode.agent.CompactEvent;
 import com.bluecode.agent.Event;
 import com.bluecode.agent.Phase;
 import com.bluecode.agent.SessionRuntime;
+import com.bluecode.agent.TeamHook;
+import com.bluecode.cli.TeamMemberRunner;
 import com.bluecode.config.AppConfig;
 import com.bluecode.config.ConfigException;
 import com.bluecode.config.ConfigLoader;
 import com.bluecode.config.ProviderConfig;
 import com.bluecode.conversation.ConversationManager;
+import com.bluecode.coordinator.Coordinator;
 import com.bluecode.hook.HookEngine;
 import com.bluecode.hook.HookLoader;
 import com.bluecode.hook.Payload;
@@ -25,10 +28,17 @@ import com.bluecode.mcp.McpManager;
 import com.bluecode.session.SessionCleaner;
 import com.bluecode.session.Writer;
 import com.bluecode.subagent.Catalog;
+import com.bluecode.team.SpawnTeammate;
+import com.bluecode.team.TeamManager;
 import com.bluecode.task.SendMessageTool;
 import com.bluecode.task.TaskGetTool;
 import com.bluecode.task.TaskListTool;
 import com.bluecode.task.TaskStopTool;
+import com.bluecode.teams.AgentNameRegistry;
+import com.bluecode.teams.TeamCreateTool;
+import com.bluecode.teams.TeamDeleteTool;
+import com.bluecode.teams.TaskCreateTool;
+import com.bluecode.teams.TaskUpdateTool;
 import com.bluecode.tool.Registry;
 import com.bluecode.tool.Tool;
 import com.bluecode.tui.bluecodeModel;
@@ -69,12 +79,23 @@ public final class bluecode {
                 Catalog subAgentCatalog = Catalog.load(root);
                 WorktreeManager worktreeMgr = createWorktreeManager(root);
                 com.bluecode.task.Manager taskManager = new com.bluecode.task.Manager();
+                AgentNameRegistry nameRegistry = new AgentNameRegistry();
+                taskManager.setNameRegistry(nameRegistry);
+                TeamManager teamManager = createTeamManager(root, worktreeMgr, taskManager, nameRegistry);
+                taskManager.onTaskDone(teamManager::handleTaskDone);
+                TeamHook teamHook = new SpawnTeammate(teamManager, worktreeMgr, taskManager, nameRegistry, root, subAgentCatalog);
+                if (TeamMemberRunner.isTeamMember(args)) {
+                    TeamMemberRunner.run(new TeamMemberRunner.Context(teamManager), TeamMemberRunner.parse(args));
+                    return;
+                }
                 AgentTool agentTool = registerSubAgentTools(
                         runtime.registry(),
                         subAgentCatalog,
                         taskManager,
                         config.effectiveEnableSubAgentBackground(),
-                        worktreeMgr);
+                        worktreeMgr,
+                        teamManager,
+                        teamHook);
                 int contextWindow = config.getProviders().size() == 1
                         ? config.getProviders().getFirst().effectiveContextWindow()
                         : 200000;
@@ -96,7 +117,9 @@ public final class bluecode {
                             taskManager,
                             subAgentCatalog,
                             hookEngine,
-                            worktreeMgr);
+                            worktreeMgr,
+                            teamManager,
+                            Coordinator.isEnabled(config));
                     agentTool.setParent(model.mainAgent());
                     Program program = new Program(model);
                     model.setProgram(program);
@@ -143,8 +166,13 @@ public final class bluecode {
             Catalog subAgentCatalog = Catalog.load(root);
             WorktreeManager worktreeMgr = createWorktreeManager(root);
             com.bluecode.task.Manager taskManager = new com.bluecode.task.Manager();
+            AgentNameRegistry nameRegistry = new AgentNameRegistry();
+            taskManager.setNameRegistry(nameRegistry);
+            TeamManager teamManager = createTeamManager(root, worktreeMgr, taskManager, nameRegistry);
+            taskManager.onTaskDone(teamManager::handleTaskDone);
+            TeamHook teamHook = new SpawnTeammate(teamManager, worktreeMgr, taskManager, nameRegistry, root, subAgentCatalog);
             AgentTool agentTool = registerSubAgentTools(runtime.registry(), subAgentCatalog, taskManager,
-                    config.effectiveEnableSubAgentBackground(), worktreeMgr);
+                    config.effectiveEnableSubAgentBackground(), worktreeMgr, teamManager, teamHook);
             SessionRuntime sessionRuntime = SessionRuntime.create(root, provider.effectiveContextWindow());
             sessionRuntime.hookEngine = hookEngine;
             try (Writer writer = Writer.create(sessionRuntime.session.sessionDir())) {
@@ -248,14 +276,35 @@ public final class bluecode {
             Catalog catalog,
             com.bluecode.task.Manager taskManager,
             boolean backgroundEnabled,
-            WorktreeManager worktreeMgr) {
-        registry.register(new TaskListTool(taskManager));
-        registry.register(new TaskGetTool(taskManager));
+            WorktreeManager worktreeMgr,
+            TeamManager teamManager,
+            TeamHook teamHook) {
+        registry.register(new TaskListTool(taskManager, teamManager));
+        registry.register(new TaskGetTool(taskManager, teamManager));
         registry.register(new TaskStopTool(taskManager));
-        registry.register(new SendMessageTool(taskManager));
-        AgentTool agentTool = new AgentTool(catalog, taskManager, null, backgroundEnabled, worktreeMgr);
+        registry.register(new SendMessageTool(taskManager, teamManager));
+        if (teamManager != null) {
+            registry.register(new TeamCreateTool(teamManager));
+            registry.register(new TeamDeleteTool(teamManager));
+            registry.register(new TaskCreateTool(teamManager));
+            registry.register(new TaskUpdateTool(teamManager));
+        }
+        AgentTool agentTool = new AgentTool(catalog, taskManager, null, backgroundEnabled, worktreeMgr, teamHook);
         registry.register(agentTool);
         return agentTool;
+    }
+
+    private static TeamManager createTeamManager(
+            Path root,
+            WorktreeManager worktreeMgr,
+            com.bluecode.task.Manager taskManager,
+            AgentNameRegistry nameRegistry) throws IOException {
+        return new TeamManager(
+                Path.of(System.getProperty("user.home")),
+                root,
+                worktreeMgr,
+                taskManager,
+                nameRegistry);
     }
 
     private static WorktreeManager createWorktreeManager(Path root) {
