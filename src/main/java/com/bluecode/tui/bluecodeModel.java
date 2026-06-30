@@ -1428,7 +1428,15 @@ public class bluecodeModel implements Model, Ui {
     }
 
     private String renderBanner() {
-        return Styles.TITLE.render("BlueCode " + VERSION + "\n" + effectiveCwd());
+        String logo = """
+             ／l、
+           （ﾟ､ ｡ ７
+             l、 ~ヽ
+             じしf_, )ノ
+            """.stripTrailing();
+
+        return Styles.TITLE.render(logo + "\nBlueCode " + VERSION + "\n" +
+                Styles.MUTED.render(effectiveCwd().toString()));
     }
 
     private void initializeWorktreeState() {
