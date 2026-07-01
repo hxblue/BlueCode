@@ -131,6 +131,7 @@ public final class Registry {
         registry.register(new BashTool());
         registry.register(new GlobTool());
         registry.register(new GrepTool());
+        registry.register(new ListDirectoryTool());
         return registry;
     }
 
