@@ -4,6 +4,7 @@ import org.jline.terminal.Size;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.terminal.Attributes;
+import org.jline.utils.InfoCmp;
 import org.jline.utils.NonBlockingReader;
 import org.jline.utils.WCWidth;
 
@@ -28,14 +29,19 @@ public class Program {
         this.model = model;
     }
 
+    private Attributes originalAttributes;
+
     public void run() {
+        boolean restored = false;
         try (Terminal created = TerminalBuilder.builder().system(true).build()) {
             terminal = created;
+            try {
             if (System.console() == null && "dumb".equalsIgnoreCase(terminal.getType())) {
                 throw new IllegalStateException("BlueCode TUI 需要交互式终端；自动化调用请使用 -p \"你的问题\"");
             }
             width = Math.max(40, terminal.getWidth());
             height = Math.max(12, terminal.getHeight());
+            originalAttributes = terminal.getAttributes();
             terminal.enterRawMode();
             disableEcho();
             running = true;
@@ -58,17 +64,57 @@ public class Program {
                 execute(result.command());
                 renderView();
             }
+            } finally {
+                running = false;
+                restoreTerminal();
+                restored = true;
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (IOException e) {
             throw new IllegalStateException("启动终端失败：" + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new IllegalStateException("启动失败: " + e.getMessage(), e);
         } finally {
             running = false;
-            clearView();
-            String dump = model == null ? "" : model.dumpHistory();
-            if (!dump.isBlank()) {
-                System.out.println(dump);
+            if (!restored) {
+                restoreTerminal();
             }
+            if (model != null) {
+                try {
+                    String dump = model.dumpHistory();
+                    if (dump != null && !dump.isBlank()) {
+                        System.out.println(dump);
+                    }
+                } catch (Exception ignored) {
+                    // dump 失败不影响退出。
+                }
+            }
+        }
+    }
+
+    private void restoreTerminal() {
+        if (terminal == null) {
+            return;
+        }
+        if (originalAttributes == null && linesRendered <= 0) {
+            return;
+        }
+        if (originalAttributes != null) {
+            try {
+                terminal.setAttributes(originalAttributes);
+            } catch (Exception ignored) {
+                // 恢复失败时不影响退出。
+            }
+        }
+        try {
+            terminal.puts(InfoCmp.Capability.exit_ca_mode);
+        } catch (Exception ignored) {
+        }
+        try {
+            terminal.writer().print("[0m[2J[H");
+            terminal.writer().flush();
+        } catch (Exception ignored) {
         }
     }
 

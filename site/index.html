@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="BlueCode 是一个 Java 21 实现的终端 AI 编程助手，支持工具调用、权限审批、MCP、SubAgent、Team 和 Worktree。"
+    >
+    <title>BlueCode | 终端 AI 编程助手</title>
+    <link rel="stylesheet" href="assets/style.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar" aria-label="BlueCode 展示站导航">
+        <a class="brand" href="#top" aria-label="BlueCode 首页">
+          <span class="brand-mark" aria-hidden="true">BC</span>
+          <span>
+            <strong>BlueCode</strong>
+            <small>Terminal AI Coding Agent</small>
+          </span>
+        </a>
+        <nav class="nav-links" aria-label="页面导航">
+          <a href="#demo">Demo</a>
+          <a href="#architecture">架构</a>
+          <a href="#run">运行</a>
+          <a href="https://github.com/hxblue/BlueCode">GitHub</a>
+        </nav>
+      </header>
+
+      <main id="top">
+        <section class="demo-band" id="demo" aria-labelledby="demo-title">
+          <div class="intro-copy">
+            <p class="eyebrow">公开展示版</p>
+            <h1 id="demo-title">BlueCode</h1>
+            <p>
+              一个从零构建的终端 AI 编程助手。这个页面播放安全的预录制场景,
+              展示 BlueCode 如何阅读代码、调用工具、审批权限和协调子 Agent。
+            </p>
+          </div>
+
+          <div class="scenario-tabs" role="tablist" aria-label="Demo 场景">
+            <button class="scenario-tab is-active" type="button" data-demo="fix" role="tab" aria-selected="true">
+              代码修复
+            </button>
+            <button class="scenario-tab" type="button" data-demo="mcp" role="tab" aria-selected="false">
+              MCP 工具
+            </button>
+            <button class="scenario-tab" type="button" data-demo="team" role="tab" aria-selected="false">
+              Team 协作
+            </button>
+          </div>
+
+          <div class="workbench" aria-label="BlueCode 交互演示">
+            <section class="terminal-panel" aria-label="终端对话">
+              <div class="terminal-toolbar">
+                <div class="window-dots" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <span class="terminal-title">bluecode --demo</span>
+                <button class="icon-button" id="replayDemo" type="button" aria-label="重新播放 demo" title="重新播放">
+                  <span aria-hidden="true">Replay</span>
+                </button>
+              </div>
+              <div class="terminal-output" id="terminalOutput" aria-live="polite"></div>
+            </section>
+
+            <aside class="inspector-panel" aria-label="工具调用与状态">
+              <div class="inspector-header">
+                <span>工具调用</span>
+                <strong id="toolProgress">0/0</strong>
+              </div>
+              <div class="tool-list" id="toolList"></div>
+              <div class="session-stats" aria-label="会话摘要">
+                <div>
+                  <span>模式</span>
+                  <strong id="modeStat">plan</strong>
+                </div>
+                <div>
+                  <span>上下文</span>
+                  <strong id="contextStat">200k</strong>
+                </div>
+                <div>
+                  <span>输出</span>
+                  <strong id="resultStat">安全回放</strong>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div class="action-row" aria-label="项目操作">
+            <a class="primary-action" href="https://github.com/hxblue/BlueCode">查看 GitHub</a>
+            <button class="secondary-action" id="copyInstall" type="button">复制运行命令</button>
+            <a class="secondary-action" href="https://github.com/hxblue/BlueCode/releases">下载 Release</a>
+            <a class="secondary-action" href="https://github.com/hxblue/BlueCode/blob/main/.bluecode/config.yaml.example">
+              配置示例
+            </a>
+          </div>
+        </section>
+
+        <section class="feature-band" aria-labelledby="features-title">
+          <div class="section-heading">
+            <p class="eyebrow">能力概览</p>
+            <h2 id="features-title">从本地终端到协作式 Agent</h2>
+          </div>
+          <div class="feature-grid">
+            <article>
+              <span class="feature-kicker">01</span>
+              <h3>工具调用</h3>
+              <p>内置读写、搜索、Shell、MCP 工具注册, 支持流式展示调用过程与结果。</p>
+            </article>
+            <article>
+              <span class="feature-kicker">02</span>
+              <h3>权限引擎</h3>
+              <p>按默认、编辑、计划、绕过等模式控制工具执行, 让高风险操作有明确边界。</p>
+            </article>
+            <article>
+              <span class="feature-kicker">03</span>
+              <h3>SubAgent</h3>
+              <p>把复杂任务拆给子 Agent, 每个任务有独立上下文、工具过滤和可恢复会话。</p>
+            </article>
+            <article>
+              <span class="feature-kicker">04</span>
+              <h3>Team + Worktree</h3>
+              <p>用独立 worktree 承载多成员协作, 通过任务列表和邮箱协调长期工作。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="architecture-band" id="architecture" aria-labelledby="architecture-title">
+          <div class="section-heading">
+            <p class="eyebrow">Architecture</p>
+            <h2 id="architecture-title">Java 21 核心运行时</h2>
+          </div>
+          <div class="architecture-map" aria-label="BlueCode 架构图">
+            <div class="arch-node arch-entry">TUI / CLI</div>
+            <div class="arch-line" aria-hidden="true"></div>
+            <div class="arch-row">
+              <div class="arch-node">SessionRuntime</div>
+              <div class="arch-node">PermissionEngine</div>
+              <div class="arch-node">HookEngine</div>
+            </div>
+            <div class="arch-line" aria-hidden="true"></div>
+            <div class="arch-row">
+              <div class="arch-node">Agent Loop</div>
+              <div class="arch-node">Tool Registry</div>
+              <div class="arch-node">MCP Manager</div>
+            </div>
+            <div class="arch-line" aria-hidden="true"></div>
+            <div class="arch-row arch-row-wide">
+              <div class="arch-node">LLM Provider</div>
+              <div class="arch-node">SubAgent / Team</div>
+              <div class="arch-node">Worktree</div>
+              <div class="arch-node">Memory</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="run-band" id="run" aria-labelledby="run-title">
+          <div class="section-heading">
+            <p class="eyebrow">Run locally</p>
+            <h2 id="run-title">本地运行</h2>
+          </div>
+          <div class="run-layout">
+            <pre class="command-block" id="installCommand"><code>git clone https://github.com/hxblue/BlueCode.git
+cd BlueCode
+./gradlew shadowJar
+java -jar build/libs/bluecode.jar</code></pre>
+            <div class="run-notes">
+              <p>需要 JDK 21。复制 `.bluecode/config.yaml.example` 为 `.bluecode/config.yaml` 后填入自己的 provider 配置。</p>
+              <p>公开展示站只播放预录制 demo, 不会读取你的本地文件, 也不会调用真实模型。</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="assets/app.js"></script>
+  </body>
+</html>

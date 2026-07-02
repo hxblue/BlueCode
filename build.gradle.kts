@@ -26,6 +26,7 @@ dependencies {
     implementation("io.modelcontextprotocol.sdk:mcp:2.0.0")
     implementation("org.yaml:snakeyaml:2.6")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.22.0")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

@@ -897,12 +897,20 @@ public final class Agent {
         return result;
     }
 
+    private String sessionId() {
+        if (runtime == null || runtime.session == null) {
+            return "";
+        }
+        String id = runtime.session.sessionId();
+        return id == null ? "" : id;
+    }
+
     private Payload hookPayload(com.bluecode.hook.Event event, Mode mode, Map<String, Object> extras) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("cwd", workspaceRoot());
         data.put("event", event.wireName());
         data.put("mode", (mode == null ? Mode.DEFAULT : mode).name().toLowerCase());
-        data.put("session_id", runtime.session == null ? "" : runtime.session.sessionId());
+        data.put("session_id", sessionId());
         if (extras != null) {
             data.putAll(extras);
         }

@@ -257,7 +257,7 @@ class AgentTest {
 
         drain(agent(client, Registry.createDefault()).run(conversation, Mode.PLAN, new CancelToken()));
 
-        assertEquals(List.of("ReadFile", "Glob", "Grep"),
+        assertEquals(List.of("ReadFile", "Glob", "Grep", "ListDirectory"),
                 client.requests.getFirst().tools().stream().map(tool -> (String) tool.get("name")).toList());
         assertTrue(client.requests.getFirst().system().stable().contains("BlueCode"));
         assertTrue(client.requests.getFirst().system().environment().contains("工作目录"));

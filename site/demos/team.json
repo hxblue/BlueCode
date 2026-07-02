@@ -1,0 +1,82 @@
+{
+  "title": "Team 协作",
+  "mode": "plan",
+  "context": "200k",
+  "result": "协作计划",
+  "tools": [
+    {
+      "name": "TeamCreate",
+      "summary": "创建 review-squad 团队。"
+    },
+    {
+      "name": "Agent",
+      "summary": "派生 Explore 与 Plan 子 Agent。"
+    },
+    {
+      "name": "TaskCreate",
+      "summary": "登记分模块任务和依赖。"
+    },
+    {
+      "name": "SendMessage",
+      "summary": "向 teammate 发送补充上下文。"
+    }
+  ],
+  "steps": [
+    {
+      "type": "user",
+      "text": "把权限系统、会话系统和 worktree 协作流程分给不同 Agent 调研, 最后汇总一个执行计划。"
+    },
+    {
+      "type": "assistant",
+      "text": "我会创建一个 Team, 每个成员拿独立 worktree, Lead 只负责拆解、收敛和验收。"
+    },
+    {
+      "type": "tool",
+      "name": "TeamCreate",
+      "status": "running"
+    },
+    {
+      "type": "tool",
+      "name": "TeamCreate",
+      "status": "done"
+    },
+    {
+      "type": "tool",
+      "name": "Agent",
+      "status": "running"
+    },
+    {
+      "type": "tool",
+      "name": "Agent",
+      "status": "done"
+    },
+    {
+      "type": "tool",
+      "name": "TaskCreate",
+      "status": "running"
+    },
+    {
+      "type": "tool",
+      "name": "TaskCreate",
+      "status": "done"
+    },
+    {
+      "type": "assistant",
+      "text": "团队已启动: Explore 负责现状扫描, Plan 负责技术方案, Lead 保留合并决策。"
+    },
+    {
+      "type": "tool",
+      "name": "SendMessage",
+      "status": "running"
+    },
+    {
+      "type": "tool",
+      "name": "SendMessage",
+      "status": "done"
+    },
+    {
+      "type": "assistant",
+      "text": "已收到 teammate 的计划片段。下一步会进入收敛阶段, 冲突通过 Lead 的 worktree 合并解决。"
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "title": "MCP 工具",
+  "mode": "default",
+  "context": "128k",
+  "result": "文档查询",
+  "tools": [
+    {
+      "name": "McpManager",
+      "summary": "读取 .bluecode.yaml 中的 context7 server。"
+    },
+    {
+      "name": "context7",
+      "summary": "查询当前库文档和配置示例。"
+    },
+    {
+      "name": "Read",
+      "summary": "对照本地 ConfigLoader 实现。"
+    },
+    {
+      "name": "Bash",
+      "summary": "执行配置加载相关测试。"
+    }
+  ],
+  "steps": [
+    {
+      "type": "user",
+      "text": "帮我确认 BlueCode 的 MCP 配置写法, 最好参考一下最新 Context7 文档。"
+    },
+    {
+      "type": "assistant",
+      "text": "我会先读取项目 MCP 配置, 再通过已配置的文档源查当前用法。"
+    },
+    {
+      "type": "tool",
+      "name": "McpManager",
+      "status": "running"
+    },
+    {
+      "type": "tool",
+      "name": "McpManager",
+      "status": "done"
+    },
+    {
+      "type": "tool",
+      "name": "context7",
+      "status": "running"
+    },
+    {
+      "type": "tool",
+      "name": "context7",
+      "status": "done"
+    },
+    {
+      "type": "tool",
+      "name": "Read",
+      "status": "running"
+    },
+    {
+      "type": "tool",
+      "name": "Read",
+      "status": "done"
+    },
+    {
+      "type": "assistant",
+      "text": "当前配置可以继续使用 HTTP MCP endpoint。建议把示例放到 docs/mcp, 并提醒用户不要提交真实 token。"
+    },
+    {
+      "type": "tool",
+      "name": "Bash",
+      "status": "running"
+    },
+    {
+      "type": "tool",
+      "name": "Bash",
+      "status": "done"
+    },
+    {
+      "type": "assistant",
+      "text": "配置加载测试通过, MCP server 失败时会降级为跳过远程工具并给出 warn。"
+    }
+  ]
+}

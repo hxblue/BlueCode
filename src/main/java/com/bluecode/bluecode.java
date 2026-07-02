@@ -225,6 +225,14 @@ public final class bluecode {
         }
     }
 
+    private static String sessionIdSafe(SessionRuntime sessionRuntime) {
+        if (sessionRuntime == null || sessionRuntime.session == null) {
+            return "";
+        }
+        String id = sessionRuntime.session.sessionId();
+        return id == null ? "" : id;
+    }
+
     private static void dispatchSessionHook(
             HookEngine hookEngine,
             SessionRuntime sessionRuntime,
@@ -237,7 +245,7 @@ public final class bluecode {
                 "cwd", root == null ? Path.of("").toAbsolutePath().normalize().toString() : root.toString(),
                 "event", event.wireName(),
                 "mode", "bypass",
-                "session_id", sessionRuntime.session == null ? "" : sessionRuntime.session.sessionId())));
+                "session_id", sessionIdSafe(sessionRuntime))));
         sessionRuntime.appendReminders(result.injectedPrompts());
     }
 

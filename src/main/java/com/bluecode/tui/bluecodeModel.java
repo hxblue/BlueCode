@@ -1100,7 +1100,11 @@ public class bluecodeModel implements Model, Ui {
 
     @Override
     public String sessionId() {
-        return runtime == null || runtime.session == null ? "" : runtime.session.sessionId();
+        if (runtime == null || runtime.session == null) {
+            return "";
+        }
+        String id = runtime.session.sessionId();
+        return id == null ? "" : id;
     }
 
     @Override

@@ -25,19 +25,20 @@ class RegistryTest {
     Path tempDir;
 
     @Test
-    void definitionsReturnsSixOrdered() {
+    void definitionsReturnsSevenOrdered() {
         Registry registry = Registry.createDefault();
 
         List<Map<String, Object>> definitions = registry.definitions();
 
-        assertEquals(6, registry.count());
-        assertEquals(6, definitions.size());
+        assertEquals(7, registry.count());
+        assertEquals(7, definitions.size());
         assertEquals("ReadFile", definitions.get(0).get("name"));
         assertEquals("WriteFile", definitions.get(1).get("name"));
         assertEquals("EditFile", definitions.get(2).get("name"));
         assertEquals("Bash", definitions.get(3).get("name"));
         assertEquals("Glob", definitions.get(4).get("name"));
         assertEquals("Grep", definitions.get(5).get("name"));
+        assertEquals("ListDirectory", definitions.get(6).get("name"));
         assertTrue(registry.get("ReadFile").isPresent());
         assertTrue(registry.get("Missing").isEmpty());
     }
@@ -46,7 +47,7 @@ class RegistryTest {
     void readOnlyDefinitionsReturnOnlySafeTools() {
         Registry registry = Registry.createDefault();
 
-        assertEquals(List.of("ReadFile", "Glob", "Grep"),
+        assertEquals(List.of("ReadFile", "Glob", "Grep", "ListDirectory"),
                 registry.readOnlyDefinitions().stream().map(tool -> (String) tool.get("name")).toList());
         assertTrue(registry.isReadOnly("ReadFile"));
         assertFalse(registry.isReadOnly("WriteFile"));
